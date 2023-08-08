@@ -26,5 +26,12 @@ func validate(conf config.Config) error {
 		}
 		m[v.Name] = true
 	}
+	m = map[string]bool{}
+	for _, v := range conf.Entities {
+		if _, exist := m[v.Name]; exist {
+			return errors.New("duplicated entity name")
+		}
+		m[v.Name] = true
+	}
 	return nil
 }
