@@ -15,9 +15,9 @@ type Entity struct {
 }
 
 type EntityAlias struct {
-	MountAccessor string `mapstructure:"mountAccessor"`
+	AuthBackEnd   string `mapstructure:"authBackEnd"`
 	Name          string `mapstructure:"name"`
-	CanonicalId   string `mapstructure:"canonicalId"`
+	EntityNameRef string `mapstructure:"entityNameRef"`
 	Id            string `mapstructure:"id"`
 	Deactived     bool   `mapstructure:"deactived"`
 }

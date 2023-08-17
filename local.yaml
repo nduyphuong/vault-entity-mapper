@@ -5,28 +5,17 @@ entities:
     team: vault
   policies:
   - default
-- name: test-2
+- name: foo
   metadata:
-    organization: hashicorp
-    team: vault
-  policies:
-  - default
-- name: test-3
-  metadata:
-    organization: hashicorp
+    organization: hashicorp1
     team: vault
   policies:
   - default
 entitiesAliases:
 - name: test
-  mountAccessor: auth_token_c40a2ec1
-  canonicalId: e6a8bd77-2bcf-f380-6d73-eecbd88984a2
-
-- name: test-alias-2
-  mountAccessor: auth_token_c40a2ec1
-  canonicalId: e62c2323-8447-f7cf-f057-1956634f6948
-
-# - name: test-alias-3
-#   deactived: true
-#   mountAccessor: auth_token_c40a2ec1
-#   canonicalId: 4d02daf7-3219-ce7a-39dd-f1ca3c4912b1
+  authBackEnd: token/
+  entityNameRef: test
+- name: foo
+  authBackEnd: token/
+  entityNameRef: foo
+  

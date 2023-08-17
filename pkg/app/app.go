@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"fmt"
 
 	client "github.com/hashicorp/vault-client-go"
 	"github.com/hashicorp/vault-client-go/schema"
@@ -22,7 +21,21 @@ func Run(conf config.Config) error {
 	if err != nil {
 		return err
 	}
+	authNameToIds := map[string]string{}
+	if len(conf.EntityAliases) != 0 {
+		r, err := c.System.AuthListEnabledMethods(ctx)
+		if err != nil {
+			return err
+		}
+		for k, v := range r.Data {
+			if _, e := authNameToIds[k]; !e {
+				authNameToIds[k] = v.(map[string]interface{})["accessor"].(string)
+			}
+		}
+		// return nil
+	}
 	var eId []string
+	entityCache := map[string]string{}
 	for _, v := range conf.Entities {
 		var d EntityLookUpResponse
 		r, _ := c.Identity.EntityLookUp(ctx, schema.EntityLookUpRequest{
@@ -39,6 +52,11 @@ func Run(conf config.Config) error {
 					log.Errorf("decode entity lookup response: %v", err)
 				}
 				decoder.Decode(r.Data)
+				// cache to mem so we don't have to lookup again when creating entity aliases
+				// safe to use provided name when we get here
+				if _, e := entityCache[v.Name]; !e {
+					entityCache[v.Name] = d.Id
+				}
 			}
 		}
 		if v.Deactived {
@@ -54,6 +72,7 @@ func Run(conf config.Config) error {
 		})
 		if err != nil {
 			log.Errorf("create entity %s: %v", v.Name, err)
+			continue
 		}
 		log.Infof("entity %s was created", v.Name)
 	}
@@ -74,13 +93,27 @@ func Run(conf config.Config) error {
 		if v.Deactived {
 			continue
 		}
+		var canonicalId string
+		if tmp, e := entityCache[v.EntityNameRef]; e {
+			canonicalId = tmp
+		} else {
+			r, _ := c.Identity.EntityLookUp(ctx, schema.EntityLookUpRequest{
+				Name: v.EntityNameRef,
+			})
+			if r != nil {
+				if r.Data != nil {
+					canonicalId = r.Data["id"].(string)
+				}
+			}
+		}
 		_, err := c.Identity.AliasCreate(ctx, schema.AliasCreateRequest{
 			Name:          v.Name,
-			CanonicalId:   v.CanonicalId,
-			MountAccessor: v.MountAccessor,
+			CanonicalId:   canonicalId,
+			MountAccessor: authNameToIds[v.AuthBackEnd],
 		})
 		if err != nil {
 			log.Errorf("create entity alias %s: %v", v.Name, err)
+			continue
 		}
 		log.Infof("entity alias %s was created", v.Name)
 	}
@@ -98,7 +131,7 @@ func Run(conf config.Config) error {
 			}
 		}
 	}
-	fmt.Printf("eAtoI: %v\n", eAtoI)
+
 	for _, v := range conf.EntityAliases {
 		if v.Deactived {
 			if _, ok := eAtoI[v.Name]; ok {
@@ -107,10 +140,24 @@ func Run(conf config.Config) error {
 			continue
 		}
 		if _, ok := eAtoI[v.Name]; !ok {
+			var canonicalId string
+			if tmp, e := entityCache[v.EntityNameRef]; e {
+				canonicalId = tmp
+			} else {
+				r, _ := c.Identity.EntityLookUp(ctx, schema.EntityLookUpRequest{
+					Name: v.EntityNameRef,
+				})
+				if r != nil {
+					if r.Data != nil {
+						canonicalId = r.Data["id"].(string)
+					}
+				}
+			}
+
 			_, err := c.Identity.AliasCreate(ctx, schema.AliasCreateRequest{
 				Name:          v.Name,
-				CanonicalId:   v.CanonicalId,
-				MountAccessor: v.MountAccessor,
+				CanonicalId:   canonicalId,
+				MountAccessor: authNameToIds[v.AuthBackEnd],
 				Id:            eAtoI[v.Name]["Id"].(string),
 			})
 			if err != nil {
@@ -118,7 +165,6 @@ func Run(conf config.Config) error {
 			}
 		}
 	}
-	fmt.Printf("eAtoI: %v\n", eAtoI)
 	for k, v := range eAtoI {
 		if v["Deactived"] == true {
 			if _, err := c.Identity.AliasReadById(ctx, v["Id"].(string)); err == nil {
