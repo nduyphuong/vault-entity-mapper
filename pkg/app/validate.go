@@ -8,7 +8,7 @@ import (
 
 /*
 *
-validate currently only validate alias name
+	validate currently only validate alias name
 
 	Prior to creating any alias it is important to consider the cardinality of the alias' name, since there are potential security issues to be aware of.
 	The main one revolves around alias reuse.
